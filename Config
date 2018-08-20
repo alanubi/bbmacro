@@ -1,0 +1,28 @@
+# *********************** #
+# Configure distribution. #
+# *********************** #
+
+VERSION  = 0.5
+TARNAME  = bbmacro-$(VERSION)
+
+# *********************** #
+# Configure installation. #
+# *********************** #
+
+DESTDIR ?=
+PREFIX  ?= /usr/local
+INCDIR   = $(PREFIX)/include
+
+# ********************** #
+# Configure compilation. #
+# ********************** #
+
+CC      ?= cc
+CFLAGS  ?=
+LDFLAGS ?=
+
+ALL_CFLAGS   = -std=c89 -pedantic -Wall -Wextra -DNOINCLUDE -O2
+ALL_LDFLAGS  = -s
+
+ALL_CFLAGS  += $(CFLAGS)
+ALL_LDFLAGS += $(LDFLAGS)
