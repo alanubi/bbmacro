@@ -20,13 +20,20 @@
  * }
  */
 
+/* Attribute for marking fallthrough case labels. */
+#if defined(__GNUC__) && !defined(__clang__)
+#  define BBFALLTHROUGH __attribute__((fallthrough))
+#else
+#  define BBFALLTHROUGH ((void)0)
+#endif
+
 /* Non-fallthrough case labels. */
 #define when(x) break; case (x):
 #define otherwise break; default:
 
 /* Regular fallthrough case labels. */
-#define and_when(x) case (x):
-#define and_otherwise default:
+#define and_when(x) BBFALLTHROUGH; case (x):
+#define and_otherwise BBFALLTHROUGH; default:
 
 /****************************************
  * Conditional jumps.

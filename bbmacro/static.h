@@ -3,7 +3,6 @@
 
 /****************************************
  * Portable attributes.
- * Please do not depend on certain compilers.
  ****************************************/
 
 /* Specifier to put before a never-returning function. */
