@@ -3,7 +3,6 @@
 
 #ifndef NOINCLUDE
 #define NOINCLUDE
-#include <stddef.h>
 #include <string.h>
 #include <bbmacro/static.h>
 #undef NOINCLUDE
@@ -15,26 +14,66 @@
  *    `B` (Backward) -- push elements into the back end;
  *    `F` (Forward)  -- push elements into the front end;
  *    `Q` (Queue)    -- push elements into the both ends.
- * 2. A type-creating macro has one more prefix:
- *    `M` (Manual)    -- manual memory management;
- *    `A` (Automatic) -- automatic memory management appendix;
- *    `-` (None)      -- automatic memory management (all-in-one).
+ * 2. Core procedures provide manual memory management only.
  * 3. Structure members are a read-only part of the interface.
  *    You are to access the members, but do not modify them directly.
  * 4. Note the vector itself is always the last argument of a procedure.
  */
 
+/*
+ * How to call the macro?
+ * 1. Usually you need a specific type for just one source file:
+ *    BVECTOR_CORE(myvector, int);
+ *
+ * 2. Often you need to separate interface and implementation:
+ *    ... in a header file ...
+ *    BVECTOR_CORE_INTERFACE(myvector, int, extern);
+ *    ... in a source file ...
+ *    BVECTOR_CORE_IMPLEMENTATION(myvector, int);
+ *
+ * 3. Sometimes you need recursive data structures:
+ *    ... in a header file ...
+ *    struct item;
+ *    BVECTOR_STRUCT(myvector, struct item);
+ *    struct item { struct myvector v; ... };
+ *    BVECTOR_CORE_DECLARATIONS(myvector, struct item, extern);
+ *    ... in a source file ...
+ *    BVECTOR_CORE_IMPLEMENTATION(myvector, struct item);
+ *
+ * 4. For BVECTOR (with automatic memory management) everything is the same,
+ *    except for the missing `_CORE` suffix and for the additional arguments
+ *    necessary to implement memory management. You can find them in the file
+ *    `memory.h`.
+ */
+
+/*
+ * How to use the vector?
+ * Consider we have used `BVECTOR_CORE_INTERFACE(myvector, int, extern);`.
+ * The macro expansion will be the following:
+ * struct myvector {
+ *   size_t len, cap;
+ *   int *at;
+ * };
+ * extern void myvector_init(int *array, size_t cap, struct myvector *bv);
+ * extern int *myvector_fini(struct myvector *bv);
+ * ...
+ * The detailed documentation is in progress.
+ */
+
 /****************************************
- * Manual memory management (`M` prefix).
+ * Backward Vector interface.
  ****************************************/
 
-/* Manual Backward Vector interface. */
-#define BBDECLARE_MBVECTOR(BV, ELEMENT, PREFIX) \
+/* Backward Vector structure. */
+#define BVECTOR_STRUCT(BV, ELEMENT) \
 \
 struct BV { \
 	size_t len, cap; /* Length and capacity. */ \
 	ELEMENT *at; /* Beginning of memory and data. */ \
-}; \
+}
+
+/* Backward Vector core procedures. */
+#define BVECTOR_CORE_DECLARATIONS(BV, ELEMENT, PREFIX) \
 \
 PREFIX void BV##_init(ELEMENT *array, size_t cap, struct BV *bv); \
 PREFIX ELEMENT *BV##_fini(struct BV *bv); \
@@ -51,13 +90,48 @@ PREFIX void BV##_resizeback(size_t len, struct BV *bv); \
 PREFIX ELEMENT *BV##_back(struct BV *bv); \
 bbstatic_semicolon
 
-/* Manual Forward Vector interface. */
-#define BBDECLARE_MFVECTOR(FV, ELEMENT, PREFIX) \
+/* Backward Vector automatic memory management appendix. */
+#define BVECTOR_AUTO_DECLARATIONS(BV, ELEMENT, PREFIX) \
+\
+PREFIX void BV##_ainit(size_t cap, struct BV *bv); \
+PREFIX void BV##_afini(struct BV *bv); \
+PREFIX void BV##_aclear(struct BV *bv); \
+\
+PREFIX void BV##_areserveback(size_t cap, struct BV *bv); \
+PREFIX void BV##_apushback(ELEMENT value, struct BV *bv); \
+PREFIX ELEMENT *BV##_agrowback(size_t num, struct BV *bv); \
+PREFIX void BV##_aresizeback(size_t len, struct BV *bv); \
+bbstatic_semicolon
+
+/* Backward Vector automatic memory management procedures. */
+#define BVECTOR_DECLARATIONS(BV, ELEMENT, PREFIX) \
+	BVECTOR_CORE_DECLARATIONS(BV, ELEMENT, PREFIX); \
+	BVECTOR_AUTO_DECLARATIONS(BV, ELEMENT, PREFIX)
+
+/* Backward Vector core interface. */
+#define BVECTOR_CORE_INTERFACE(BV, ELEMENT, PREFIX) \
+	BVECTOR_STRUCT(BV, ELEMENT); \
+	BVECTOR_CORE_DECLARATIONS(BV, ELEMENT, PREFIX)
+
+/* Backward Vector automatic memory management interface. */
+#define BVECTOR_INTERFACE(BV, ELEMENT, PREFIX) \
+	BVECTOR_STRUCT(BV, ELEMENT); \
+	BVECTOR_DECLARATIONS(BV, ELEMENT, PREFIX)
+
+/****************************************
+ * Forward Vector interface.
+ ****************************************/
+
+/* Forward Vector structure. */
+#define FVECTOR_STRUCT(FV, ELEMENT) \
 \
 struct FV { \
 	size_t len, cap; /* Length and capacity. */ \
 	ELEMENT *neg; /* End of memory and data. */ \
-}; \
+}
+
+/* Forward Vector core procedures. */
+#define FVECTOR_CORE_DECLARATIONS(FV, ELEMENT, PREFIX) \
 \
 PREFIX void FV##_init(ELEMENT *array, size_t cap, struct FV *fv); \
 PREFIX ELEMENT *FV##_fini(struct FV *fv); \
@@ -74,8 +148,40 @@ PREFIX void FV##_resizefront(size_t len, struct FV *fv); \
 PREFIX ELEMENT *FV##_front(struct FV *fv); \
 bbstatic_semicolon
 
-/* Manual Backward Vector implementation. */
-#define BBDEFINE_MBVECTOR(BV, ELEMENT) \
+/* Forward Vector automatic memory management appendix. */
+#define FVECTOR_AUTO_DECLARATIONS(FV, ELEMENT, PREFIX) \
+\
+PREFIX void FV##_ainit(size_t cap, struct FV *fv); \
+PREFIX void FV##_afini(struct FV *fv); \
+PREFIX void FV##_aclear(struct FV *fv); \
+\
+PREFIX void FV##_areservefront(size_t cap, struct FV *fv); \
+PREFIX void FV##_apushfront(ELEMENT value, struct FV *fv); \
+PREFIX ELEMENT *FV##_agrowfront(size_t num, struct FV *fv); \
+PREFIX void FV##_aresizefront(size_t len, struct FV *fv); \
+bbstatic_semicolon
+
+/* Forward Vector automatic memory management procedures. */
+#define FVECTOR_DECLARATIONS(FV, ELEMENT, PREFIX) \
+	FVECTOR_CORE_DECLARATIONS(FV, ELEMENT, PREFIX); \
+	FVECTOR_AUTO_DECLARATIONS(FV, ELEMENT, PREFIX)
+
+/* Forward Vector core interface. */
+#define FVECTOR_CORE_INTERFACE(FV, ELEMENT, PREFIX) \
+	FVECTOR_STRUCT(FV, ELEMENT); \
+	FVECTOR_CORE_DECLARATIONS(FV, ELEMENT, PREFIX)
+
+/* Forward Vector automatic memory management interface. */
+#define FVECTOR_INTERFACE(FV, ELEMENT, PREFIX) \
+	FVECTOR_STRUCT(FV, ELEMENT); \
+	FVECTOR_DECLARATIONS(FV, ELEMENT, PREFIX)
+
+/****************************************
+ * Backward Vector implementation.
+ ****************************************/
+
+/* Backward Vector core procedures. */
+#define BVECTOR_CORE_IMPLEMENTATION(BV, ELEMENT) \
 \
 void BV##_init(ELEMENT *array, size_t cap, struct BV *bv) \
 {	bv->at = array; \
@@ -123,8 +229,75 @@ ELEMENT *BV##_back(struct BV *bv) \
 } \
 bbstatic_semicolon
 
-/* Manual Forward Vector implementation. */
-#define BBDEFINE_MFVECTOR(FV, ELEMENT) \
+/* Backward Vector automatic memory management appendix. */
+#define BVECTOR_AUTO_IMPLEMENTATION(BV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
+\
+void BV##_ainit(size_t cap, struct BV *bv) \
+{	ELEMENT *ptr = ALLOC(cap, sizeof(ELEMENT)); \
+	BV##_init(ptr, cap, bv); \
+} \
+void BV##_afini(struct BV *bv) \
+{	FREE(BV##_fini(bv)); \
+} \
+void BV##_aclear(struct BV *bv) \
+{	FREE(bv->at); \
+	bv->at = NULL; \
+	bv->len = 0; \
+	bv->cap = 0; \
+} \
+void BV##_areserveback(size_t cap, struct BV *bv) \
+{	ELEMENT *ptr = ALLOC(cap, sizeof(ELEMENT)); \
+	FREE(BV##_reserveback(ptr, cap, bv)); \
+} \
+void BV##_apushback(ELEMENT value, struct BV *bv) \
+{	if (BV##_full(bv)) \
+		BV##_areserveback(NEXT_CAP(bv->cap), bv); \
+	BV##_pushback(value, bv); \
+} \
+ELEMENT *BV##_agrowback(size_t num, struct BV *bv) \
+{	size_t len = bv->len + num; \
+	size_t cap = bv->cap; \
+	if (len > cap) { \
+		cap = NEXT_CAP(cap); \
+		if (len > cap) \
+			cap = len; \
+		BV##_areserveback(cap, bv); \
+	} \
+	return BV##_growback(num, bv); \
+} \
+void BV##_aresizeback(size_t len, struct BV *bv) \
+{	size_t cap = bv->cap; \
+	if (len > cap) { \
+		cap = NEXT_CAP(cap); \
+		if (len > cap) \
+			cap = len; \
+		BV##_areserveback(cap, bv); \
+	} \
+	bv->len = len; \
+} \
+bbstatic_semicolon
+
+/* Backward Vector automatic memory management procedures. */
+#define BVECTOR_IMPLEMENTATION(BV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
+	BVECTOR_CORE_IMPLEMENTATION(BV, ELEMENT); \
+	BVECTOR_AUTO_IMPLEMENTATION(BV, ELEMENT, ALLOC, FREE, NEXT_CAP)
+
+/* Backward Vector core full. */
+#define BVECTOR_CORE(BV, ELEMENT) \
+	BVECTOR_CORE_INTERFACE(BV, ELEMENT, static BBUNUSED); \
+	BVECTOR_CORE_IMPLEMENTATION(BV, ELEMENT)
+
+/* Backward Vector automatic memory management full. */
+#define BVECTOR(BV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
+	BVECTOR_INTERFACE(BV, ELEMENT, static BBUNUSED); \
+	BVECTOR_IMPLEMENTATION(BV, ELEMENT, ALLOC, FREE, NEXT_CAP)
+
+/****************************************
+ * Forward Vector implementation.
+ ****************************************/
+
+/* Forward Vector core procedures. */
+#define FVECTOR_CORE_IMPLEMENTATION(FV, ELEMENT) \
 \
 void FV##_init(ELEMENT *array, size_t cap, struct FV *fv) \
 {	fv->neg = array + cap; \
@@ -173,86 +346,8 @@ ELEMENT *FV##_front(struct FV *fv) \
 } \
 bbstatic_semicolon
 
-/****************************************
- * Automatic memory management appendix (`A` prefix).
- ****************************************/
-
-/* Automatic Backward Vector interface. */
-#define BBDECLARE_ABVECTOR(BV, ELEMENT, PREFIX) \
-\
-PREFIX void BV##_ainit(size_t cap, struct BV *bv); \
-PREFIX void BV##_afini(struct BV *bv); \
-PREFIX void BV##_aclear(struct BV *bv); \
-\
-PREFIX void BV##_areserveback(size_t cap, struct BV *bv); \
-PREFIX void BV##_apushback(ELEMENT value, struct BV *bv); \
-PREFIX ELEMENT *BV##_agrowback(size_t num, struct BV *bv); \
-PREFIX void BV##_aresizeback(size_t len, struct BV *bv); \
-bbstatic_semicolon
-
-/* Automatic Forward Vector interface. */
-#define BBDECLARE_AFVECTOR(FV, ELEMENT, PREFIX) \
-\
-PREFIX void FV##_ainit(size_t cap, struct FV *fv); \
-PREFIX void FV##_afini(struct FV *fv); \
-PREFIX void FV##_aclear(struct FV *fv); \
-\
-PREFIX void FV##_areservefront(size_t cap, struct FV *fv); \
-PREFIX void FV##_apushfront(ELEMENT value, struct FV *fv); \
-PREFIX ELEMENT *FV##_agrowfront(size_t num, struct FV *fv); \
-PREFIX void FV##_aresizefront(size_t len, struct FV *fv); \
-bbstatic_semicolon
-
-/* Automatic Backward Vector implementation. */
-#define BBDEFINE_ABVECTOR(BV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
-\
-void BV##_ainit(size_t cap, struct BV *bv) \
-{	ELEMENT *ptr = ALLOC(cap, sizeof(ELEMENT)); \
-	BV##_init(ptr, cap, bv); \
-} \
-void BV##_afini(struct BV *bv) \
-{	FREE(BV##_fini(bv)); \
-} \
-void BV##_aclear(struct BV *bv) \
-{	FREE(bv->at); \
-	bv->at = NULL; \
-	bv->len = 0; \
-	bv->cap = 0; \
-} \
-void BV##_areserveback(size_t cap, struct BV *bv) \
-{	ELEMENT *ptr = ALLOC(cap, sizeof(ELEMENT)); \
-	FREE(BV##_reserveback(ptr, cap, bv)); \
-} \
-void BV##_apushback(ELEMENT value, struct BV *bv) \
-{	if (BV##_full(bv)) \
-		BV##_areserveback(NEXT_CAP(bv->cap), bv); \
-	BV##_pushback(value, bv); \
-} \
-ELEMENT *BV##_agrowback(size_t num, struct BV *bv) \
-{	size_t len = bv->len + num; \
-	size_t cap = bv->cap; \
-	if (len > cap) { \
-		cap = NEXT_CAP(cap); \
-		if (len > cap) \
-			cap = len; \
-		BV##_areserveback(cap, bv); \
-	} \
-	return BV##_growback(num, bv); \
-} \
-void BV##_aresizeback(size_t len, struct BV *bv) \
-{	size_t cap = bv->cap; \
-	if (len > cap) { \
-		cap = NEXT_CAP(cap); \
-		if (len > cap) \
-			cap = len; \
-		BV##_areserveback(cap, bv); \
-	} \
-	bv->len = len; \
-} \
-bbstatic_semicolon
-
-/* Automatic Forward Vector implementation. */
-#define BBDEFINE_AFVECTOR(FV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
+/* Forward Vector automatic memory management appendix. */
+#define FVECTOR_AUTO_IMPLEMENTATION(FV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
 \
 void FV##_ainit(size_t cap, struct FV *fv) \
 {	ELEMENT *ptr = ALLOC(cap, sizeof(ELEMENT)); \
@@ -299,24 +394,38 @@ void FV##_aresizefront(size_t len, struct FV *fv) \
 } \
 bbstatic_semicolon
 
+/* Forward Vector automatic memory management procedures. */
+#define FVECTOR_IMPLEMENTATION(FV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
+	FVECTOR_CORE_IMPLEMENTATION(FV, ELEMENT); \
+	FVECTOR_AUTO_IMPLEMENTATION(FV, ELEMENT, ALLOC, FREE, NEXT_CAP)
+
+/* Forward Vector core full. */
+#define FVECTOR_CORE(FV, ELEMENT) \
+	FVECTOR_CORE_INTERFACE(FV, ELEMENT, static BBUNUSED); \
+	FVECTOR_CORE_IMPLEMENTATION(FV, ELEMENT)
+
+/* Forward Vector automatic memory management full. */
+#define FVECTOR(FV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
+	FVECTOR_INTERFACE(FV, ELEMENT, static BBUNUSED); \
+	FVECTOR_IMPLEMENTATION(FV, ELEMENT, ALLOC, FREE, NEXT_CAP)
+
 /****************************************
- * Unite manual and automatic memory management (No prefix).
+ * Legacy.
  ****************************************/
 
-#define BBDECLARE_BVECTOR(BV, ELEMENT, PREFIX) \
-	BBDECLARE_MBVECTOR(BV, ELEMENT, PREFIX); \
-	BBDECLARE_ABVECTOR(BV, ELEMENT, PREFIX)
+#define BBDECLARE_MBVECTOR BVECTOR_CORE_INTERFACE
+#define BBDECLARE_MFVECTOR FVECTOR_CORE_INTERFACE
+#define BBDEFINE_MBVECTOR  BVECTOR_CORE_IMPLEMENTATION
+#define BBDEFINE_MFVECTOR  FVECTOR_CORE_IMPLEMENTATION
 
-#define BBDECLARE_FVECTOR(FV, ELEMENT, PREFIX) \
-	BBDECLARE_MFVECTOR(FV, ELEMENT, PREFIX); \
-	BBDECLARE_AFVECTOR(FV, ELEMENT, PREFIX)
+#define BBDECLARE_ABVECTOR BVECTOR_AUTO_DECLARATIONS
+#define BBDECLARE_AFVECTOR FVECTOR_AUTO_DECLARATIONS
+#define BBDEFINE_ABVECTOR  BVECTOR_AUTO_IMPLEMENTATION
+#define BBDEFINE_AFVECTOR  FVECTOR_AUTO_IMPLEMENTATION
 
-#define BBDEFINE_BVECTOR(BV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
-	BBDEFINE_MBVECTOR(BV, ELEMENT); \
-	BBDEFINE_ABVECTOR(BV, ELEMENT, ALLOC, FREE, NEXT_CAP)
-
-#define BBDEFINE_FVECTOR(FV, ELEMENT, ALLOC, FREE, NEXT_CAP) \
-	BBDEFINE_MFVECTOR(FV, ELEMENT); \
-	BBDEFINE_AFVECTOR(FV, ELEMENT, ALLOC, FREE, NEXT_CAP)
+#define BBDECLARE_BVECTOR  BVECTOR_INTERFACE
+#define BBDECLARE_FVECTOR  FVECTOR_INTERFACE
+#define BBDEFINE_BVECTOR   BVECTOR_IMPLEMENTATION
+#define BBDEFINE_FVECTOR   FVECTOR_IMPLEMENTATION
 
 #endif

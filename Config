@@ -2,7 +2,7 @@
 # Configure distribution. #
 # *********************** #
 
-VERSION  = 0.5
+VERSION  = 0.6
 TARNAME  = bbmacro-$(VERSION)
 
 # *********************** #
